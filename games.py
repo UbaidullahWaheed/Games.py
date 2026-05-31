@@ -81,6 +81,8 @@ class GameHub(tk.Tk):
     # ── launcher ─────────────────────────────────────────────────────────────
 
     def _build_launcher(self):
+        # FIX: unbind any leftover key bindings from Hangman before rebuilding launcher
+        self.unbind("<Key>")
         self._clear()
 
         # header
@@ -532,10 +534,14 @@ class HangmanGame:
         hdr = tk.Frame(self.app, bg=h.PANEL, height=58)
         hdr.pack(fill="x")
         hdr.pack_propagate(False)
+
+        # FIX: use _go_back instead of h._build_launcher directly
+        # so we can unbind the key listener first
         tk.Button(hdr, text="← Back", font=(h.FONT, 10),
                   bg=h.PANEL, fg=h.MUTED, relief="flat", bd=0,
                   padx=10, cursor="hand2",
-                  command=h._build_launcher).pack(side="left", padx=14, pady=14)
+                  command=self._go_back).pack(side="left", padx=14, pady=14)
+
         tk.Label(hdr, text="🪢  Hangman",
                  font=(h.FONT, 16, "bold"), bg=h.PANEL, fg=h.TEXT).pack(side="left", padx=8)
         tk.Label(hdr, text="Guess the word before it's too late!",
@@ -611,10 +617,10 @@ class HangmanGame:
                                    bg=h.BG, fg=h.TEXT)
         self.status_lbl.pack(anchor="w", pady=(10, 6))
 
+        # FIX: removed invalid 'letterSpacing=8' kwarg that caused TclError
         self.word_lbl = tk.Label(info, text="",
                                  font=("Courier New", 26, "bold"),
-                                 bg=h.BG, fg=h.CYAN,
-                                 letterSpacing=8)
+                                 bg=h.BG, fg=h.CYAN)
         self.word_lbl.pack(anchor="w", pady=6)
 
         self.hint_lbl = tk.Label(info, text="",
@@ -653,8 +659,13 @@ class HangmanGame:
                 btn.pack(side="left", padx=2, pady=3)
                 self.key_btns[ch] = btn
 
-        # bind keyboard
+        # FIX: bind keyboard input for letter guessing
         self.app.bind("<Key>", self._key_press)
+
+    # FIX: new back method that safely unbinds key listener before navigating
+    def _go_back(self):
+        self.app.unbind("<Key>")
+        self.hub._build_launcher()
 
     # ── game logic ────────────────────────────────────────────────────────────
 
@@ -690,7 +701,8 @@ class HangmanGame:
 
     def _key_press(self, event):
         ch = event.char.upper()
-        if ch in self.key_btns:
+        # FIX: guard against non-alpha keys (e.g. Enter, Shift, arrow keys)
+        if ch and ch in self.key_btns:
             self._guess(ch)
 
     def _check_end(self):
